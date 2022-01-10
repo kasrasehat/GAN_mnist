@@ -7,6 +7,7 @@ from torchvision.utils import make_grid
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from Networks import Generator, Discriminator
+from IPython.display import clear_output
 
 torch.manual_seed(0) # Set for testing purposes, please do not change!
 
@@ -34,7 +35,7 @@ def get_noise(n_samples, z_dim, device='cpu'):
 
 
 criterion = nn.BCEWithLogitsLoss()
-n_epochs = 200
+n_epochs = 20
 z_dim = 64
 display_step = 500
 batch_size = 128
@@ -127,3 +128,42 @@ def get_gen_loss(gen, disc, criterion, num_images, z_dim, device):
     label_of_fake = torch.ones_like(pred_of_fake)
     gen_loss = criterion(pred_of_fake, label_of_fake)
     return gen_loss
+
+
+mean_generator_loss = 0
+mean_discriminator_loss = 0
+
+for epoch in range(n_epochs):
+    for i , data in enumerate(dataloader):
+
+        real = data[0].view(len(data[0]), -1).to(device)
+        num_images = len(data[0])
+        disc_loss = get_disc_loss(gen, disc, criterion= criterion, real= real, num_images= num_images, z_dim= z_dim, device=device)
+        disc_opt.zero_grad()
+        disc_loss.backward(retain_graph = True)
+        disc_opt.step()
+
+        gen_loss = get_gen_loss(gen, disc, criterion= criterion, num_images= num_images, z_dim= z_dim, device=device)
+        gen_opt.zero_grad()
+        gen_loss.backward()
+        gen_opt.step()
+
+        # Keep track of the average discriminator loss
+        mean_discriminator_loss += disc_loss.item() / display_step
+
+        # Keep track of the average generator loss
+        mean_generator_loss += gen_loss.item() / display_step
+
+        if i % display_step == 0 and (epoch % 2 == 0) :
+
+            im_num = 25
+            noise_vec = get_noise(im_num, z_dim, device=device)
+            generated_images = gen(noise_vec)
+            show_tensor_images(real, im_num, size=(1, 28, 28))
+            show_tensor_images(generated_images, im_num, size=(1, 28, 28))
+            print(f"epoch {epoch}: Generator loss: {mean_generator_loss}, discriminator loss: {mean_discriminator_loss}")
+            mean_generator_loss = 0
+            mean_discriminator_loss = 0
+
+
+
